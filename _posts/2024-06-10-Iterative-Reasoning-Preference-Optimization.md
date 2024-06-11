@@ -7,7 +7,7 @@ tags: [LLM, DPO]
 ---
 
 ### 논문 링크
-- https://arxiv.org/pdf/2404.19733
+- [논문 링크](https://arxiv.org/pdf/2404.19733)
 - 발표 기관: Meta, New York University
 
 
@@ -27,20 +27,29 @@ tags: [LLM, DPO]
 - DPO로 학습한 모델을 이용해서 Chain-of-Thought + 정답을 N개 생성하게 한 뒤, 그걸 데이터셋으로 삼아서 다시 DPO를 학습시키는 방식.
 - 따라서 language model이 기본적으로 reasoning step을 생성하고, 답을 생성하는 능력을 가지고 있어야 한다.
 - 또한, LM이 생성한 답변에서 preference pair를 뽑아내야 하는데, 여기서는 실제 정답을 놓고, 맞춘 것과 틀린 것으로 pair를 구성했다.
-
+$$A=\begin{bmatrix}
+0 & 1 & 2\\
+3 & 4 & 5\\
+6 & 7 & 8
+\end{bmatrix}
+$$
 
 
 
 ## 학습 방법
 - Loss function은 아래 두 개의 term으로 구성된다. w는 이긴 (정답을 맞춘) 데이터, l는 진 (정답을 틀린) 데이터셋이다.  c는 chain-of-thought 데이터, y는 정답 데이터를 의미한다. 이 loss는 t+1번째 iteration에서의 loss이다.
-$$L_{DPO+NLL} = L_{NLL}(x_i,c_i^w,y_i^w) + \alpha L_{DPO}(c_i^w,y_i^w,c_i^l,y_i^l|x_i)$$
+$$L_{DPO+NLL} = L_{NLL}(x_i,c_i^w,y_i^w) + \alpha L_{DPO}(c_i^w,y_i^w,c_i^l,y_i^l|x_i)
+$$
 - 각각의 Loss는 아래와 같다.
-$$L_{NLL} = -\frac{\log{M_{\theta}(x_i,c_i^w,y_i^w)}}{|x_i|+|c_i^w|+|y_i^w|} \newline L_{DPO} = \log{\sigma (\beta \frac{\log{M_{\theta}(c_i^w,y_i^w|x_i)}}{\log{M_t(c_i^w,y_i^w|x_i)}} - \beta \frac{\log{M_{\theta}(c_i^l,y_i^l|x_i)}}{\log{M_t(c_i^l,y_i^l|x_i)}})}$$
+$$L_{NLL} = -\frac{\log{M_{\theta}(x_i,c_i^w,y_i^w)}}{|x_i|+|c_i^w|+|y_i^w|} \newline L_{DPO} = \log{\sigma (\beta \frac{\log{M_{\theta}(c_i^w,y_i^w|x_i)}}{\log{M_t(c_i^w,y_i^w|x_i)}} - \beta \frac{\log{M_{\theta}(c_i^l,y_i^l|x_i)}}{\log{M_t(c_i^l,y_i^l|x_i)}})}
+$$
 - 이 학습은 t번째 모델에서 생성된 데이터로 이루어지며, 학습 데이터 $D = \{x_i, y_i\}$를 이용해서 생성하고, reward까지 측정한 데이터셋이다.
-$$G_i = \{c_i^n,y_i^n,r_i^n\}_{n \in [1,N] }$$
+$$G_i = \{c_i^n,y_i^n,r_i^n\}_{n \in [1,N] }
+$$
 - 여기에서는 정답을 맞췄는지, 틀렸는지로 구분하기 때문에, winner 그룹과 loser 그룹이 각각 아래처럼 나눠진다.
   - 여기서 K개의 페어를 구성함으로써 데이터셋을 만든다.
-$$G_i^w = \{c_i^n,y_i^n|r_i^n=1\} \text{ and } G_i^l=\{c_i^n,y_i^n|r_i^n=0\}$$
+$$G_i^w = \{c_i^n,y_i^n|r_i^n=1\} \text{ and } G_i^l=\{c_i^n,y_i^n|r_i^n=0\}
+$$
 - Iterative Training
 ![image](/assets/img_post/irpo_img2.png)
   - 기존의 방식에 비해서 간단한데, `Self-Rewarding LLM training` 방식은 그 때마다 생성된 새로운 prompt를 사용하고, 그러다보니 복잡한 reward model이 필요하다. 우리 방식은 gold label을 사용하고, 고정된 prompt를 쓰기 때문에 간단하다.
