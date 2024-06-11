@@ -35,18 +35,22 @@ tags: [LLM, DPO]
 
 $$L_{DPO+NLL} = L_{NLL}(x_i,c_i^w,y_i^w) + \alpha L_{DPO}(c_i^w,y_i^w,c_i^l,y_i^l|x_i)
 $$
+
 - 각각의 Loss는 아래와 같다.
 
 $$L_{NLL} = -\frac{\log{M_{\theta}(x_i,c_i^w,y_i^w)}}{|x_i|+|c_i^w|+|y_i^w|}$$
 
-$$L_{DPO} = \log{\sigma (\beta \frac{\log{M_{\theta}(c_i^w,y_i^w|x_i)}}{\log{M_t(c_i^w,y_i^w|x_i)}} - \beta \frac{\log{M_{\theta}(c_i^l,y_i^l|x_i)}}{\log{M_t(c_i^l,y_i^l|x_i)}})}
-$$
+$$L_{DPO} = \log{\sigma (\beta \frac{\log{M_{\theta}(c_i^w,y_i^w|x_i)}}{\log{M_t(c_i^w,y_i^w|x_i)}} - \beta \frac{\log{M_{\theta}(c_i^l,y_i^l|x_i)}}{\log{M_t(c_i^l,y_i^l|x_i)}})}$$
+
 - 이 학습은 t번째 모델에서 생성된 데이터로 이루어지며, 학습 데이터 $D = \{x_i, y_i\}$를 이용해서 생성하고, reward까지 측정한 데이터셋이다.
 
 $$G_i = \{c_i^n,y_i^n,r_i^n\}_{n \in [1,N] }$$
+
 - 여기에서는 정답을 맞췄는지, 틀렸는지로 구분하기 때문에, winner 그룹과 loser 그룹이 각각 아래처럼 나눠진다.
   - 여기서 K개의 페어를 구성함으로써 데이터셋을 만든다.
+  
   $$G_i^w = \{c_i^n,y_i^n|r_i^n=1\} \text{ and } G_i^l=\{c_i^n,y_i^n|r_i^n=0\}$$
+
 - Iterative Training
 ![image](/assets/img_post/irpo_img2.png)
   - 기존의 방식에 비해서 간단한데, `Self-Rewarding LLM training` 방식은 그 때마다 생성된 새로운 prompt를 사용하고, 그러다보니 복잡한 reward model이 필요하다. 우리 방식은 gold label을 사용하고, 고정된 prompt를 쓰기 때문에 간단하다.
