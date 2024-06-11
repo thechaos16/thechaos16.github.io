@@ -1,9 +1,9 @@
 ---
-title: Generative Agents: Interactive Simulacra of Human Behavior
+title: Generative Agents, Interactive Simulacra of Human Behavior
 author: ethereal
 date: 2024-06-12 00:31:00 +0900
 categories: [ML]
-tags: [LLM, Decision_Making]
+tags: [LLM, DecisionMaking]
 ---
 
 ### 논문 링크
