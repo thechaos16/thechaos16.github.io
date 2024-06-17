@@ -7,7 +7,7 @@ tags: [LLM, Factuality]
 ---
 
 ### 논문 링크
-- https://arxiv.org/abs/2311.07689
+- [논문 링크](https://arxiv.org/abs/2311.07689)
 
 
 ## 개요
@@ -23,7 +23,7 @@ tags: [LLM, Factuality]
 ![image](/assets/img_post/mart_1.png)
 - Model and Instruction Tuning Seed
     - 일반적인 instruction tuning으로 LIMA와 Open Assistant 데이터셋을 사용했다.
-    - LLaMA 65B를 두 개의 데이터셋으로 학습해서, 각각 $M_{tgt}$와 $M_{adv}$를 얻는데, tgt는 생성 모델, adv는 프롬프트를 생성하는 adversarial model이다.
+    - LLaMA 65B를 두 개의 데이터셋으로 학습해서, 각각 M_tgt와 M_adv를 얻는데, tgt는 생성 모델, adv는 프롬프트를 생성하는 adversarial model이다.
         - 둘이 같은 데이터로 학습한 같은 모델인지, 아니면 LIMA와 Open Assistant를 사용해서 각각 학습한 건지 확인 필요
 - Red-teaming Seed
     - 거대 언어 모델의 한계를 증명할 수 있는 약 2.4K의 프롬프트 (답변은 없는)를 구성했다.
@@ -45,11 +45,9 @@ tags: [LLM, Factuality]
 -  adversarial을 supervised pairwise training 방식을 이용해서 학습했다.
 - adversarial model은, 잘못된 모델의 행동을 유도하는 prompt를 받으면, 그와 유사한 category와 attack style을 가진 다른 prompt를 생성하도록 학습한다.
 - Red-teaming Seed 스텝에서, 1700개의 데이터 중 랜덤하게 샘플된 (같은 유형의) 데이터들을 이용해서 학습한다.
-- 이후에는 $M_{tgt}$와 $M_{adv}$가 iteratively 학습하게 된다.
+- 이후에는 M_tgt와 M_adv가 iteratively 학습하게 된다.
 - i번째 스텝
-    - $P^{i-1}_{adv}$: i-1 번째 스텝에서 adversarial model이 생성한 프롬프트로, 성공적인 탈옥 (safety score가 일정 threshold 이하)을 한 샘플들만 선정
-    - adversarial 모델을 돌려서, i-1 번째 스텝에서 성공적인 프롬프트들과 유사한 프롬프트인 $P^i_{gen}$를 생성한다.
-    - target 모델을 돌려서 얻은 답변 $A^i_{tgt}$를, reward model을 돌려서 safety score를 비교하고, threshold 보다 낮은 prompt들을 모아서 $P^i_{adv}$를 구성한다.
+  ![image](/assets/img_post/mart_7.png)
 - 성공적인 공격을 한 prompt들과, 그들을 생성하게 만든 i-1 번째 스텝의 adversarial example을 pair로 만들어서 adversarial 모델을 학습시킨다.
 - 또한, Red-teaming Seed에서 사용한 데이터 역시 섞어서 학습시킴으로써, 대화 능력을 잃지 않도록 했다.
 ![image](/assets/img_post/mart_2.png)
@@ -58,7 +56,7 @@ tags: [LLM, Factuality]
 
 
 ## Approach - feedback을 이용해서 학습시키기
-- adversarial model이 생성한 prompt $P^i_{adv}$에 대해서 target model이 $R^i_{tgt}$를 생성한다. 각각을 helpfulness, safety의 관점에서 학습한 reward 모델을 돌리고, 둘 다 threshold를 넘는 response만 추출해서, prompt → reward pair로 supervised fine tune과 동일한 방법으로 학습시킨다.
+- adversarial model이 생성한 prompt에 대해서 target model이 reward (R)를 생성한다. 각각을 helpfulness, safety의 관점에서 학습한 reward 모델을 돌리고, 둘 다 threshold를 넘는 response만 추출해서, prompt → reward pair로 supervised fine tune과 동일한 방법으로 학습시킨다.
 - reward의 값을 사용하지 않고, threshold로 구분하게 되면 학습에 들어가는 데이터 숫자가 적어지지만, 데이터 퀄리티를 보장할 수 있다. 이런 문제를 context distillation과 rejection sampling을 이용해서 해결했다.
 - context distillation
     - 첫 번째 iteration에서는 target model의 성능이 별로인 경우가 많은데, 이러면 다음 스텝에 학습할 데이터가 없다.
@@ -74,8 +72,7 @@ tags: [LLM, Factuality]
 
 
 ## Approach - 두 모델을 순차적으로 학습시키기
-- 스텝 i에서 $M^i_{adv}$는 $P^{i-1}_{adv}$를 넣어서 $P^i_{adv}$를 생성한다. 여기서 safety score를 넘지 못하는 reponse를 만든 prompt를 선택해서, $M^{i+1}_{adv}$를 학습시킨다.
-- 마찬가지로, $M^i_{tgt}$가 $P^{i-1}_{adv}$를 넣어서 생성한 $R^i_{tgt}$에서, safety와 helpfulness를 전부 넘는 항목들을 이용해서 $M^{i+1}_{tgt}$를 학습시킨다.
+![image](/assets/img_post/mart_8.png)
 
 
 ## 실험 셋업
