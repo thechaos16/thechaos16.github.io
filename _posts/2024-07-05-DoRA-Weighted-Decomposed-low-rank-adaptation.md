@@ -1,136 +1,104 @@
 ---
-title: MART, Improving LLM Safety with Multi-round Automatic Red-Teaming
+title: DoRA, Weight-Decomposed Low-Rank Adaptation
 author: ethereal
-date: 2024-06-17 22:14:00 +0900
+date: 2024-07-05 00:49:00 +0900
 categories: [ML]
-tags: [LLM, Factuality]
+tags: [LLM, Peft]
 ---
 
-### 논문 링크
-- [논문 링크](https://arxiv.org/abs/2311.07689)
+## 논문 링크
+- [논문 링크](https://arxiv.org/abs/2402.09353)
 
 
-## 개요
-- LLM의 이상한 행동을 제어하기 위한 수단으로, 사람이 개입하는 red teaming이 효과적이다.
-    - 이상한 행동들로는, 가짜를 진짜처럼 말하거나, 유해한 응답, 혹은 불법적인 이야기를 하는 것들이다.
-- 이걸 확장해서, adversarial LLM과 target LLM으로 구분해서 자동으로 학습하도록 만들 수 있다.
-- Adversarial LLM은 공격하기 좋은 prompt를 생성하고, target LLM은 그 생성된 prompt에서 안전하게 생성하도록 학습한다.
-- reward model이 이런 수고를 조금 덜어주긴 하지만, prompt 생성 그 자체는 여전히 사람들이 여러 차례 시도해서 찾아낸다.
+## 배경
+- LoRA를 위시로 한 PEFT 방법론이 널리 사용되고 있는데, full fine-tuning 방법과 비교했을 때 여전히 성능의 갭이 있다.
+- 이 논문에서 그 갭의 원인을 파악하고, 이를 수정하는 DoRA라는 방법론을 제시한다.
 
 
-
-## Approach - 초기화
-![image](/assets/img_post/mart_1.png)
-- Model and Instruction Tuning Seed
-    - 일반적인 instruction tuning으로 LIMA와 Open Assistant 데이터셋을 사용했다.
-    - LLaMA 65B를 두 개의 데이터셋으로 학습해서, 각각 M_tgt와 M_adv를 얻는데, tgt는 생성 모델, adv는 프롬프트를 생성하는 adversarial model이다.
-        - 둘이 같은 데이터로 학습한 같은 모델인지, 아니면 LIMA와 Open Assistant를 사용해서 각각 학습한 건지 확인 필요
-- Red-teaming Seed
-    - 거대 언어 모델의 한계를 증명할 수 있는 약 2.4K의 프롬프트 (답변은 없는)를 구성했다.
-    - 모델의 위험을 두 가지로 구분했다. (자세한 것은 llama2 논문에)
-        - violation category
-            - LLM이 안전하지 않은 컨텐츠를 생성할 가능성이 높은 주제들
-        - attack style
-            - 모델이 이상하게 행동하도록 유도하는 다양한 프롬프트 테크닉
-    - 이 데이터를 이용해서, $M_{adv}$를 warm-up 했다.
-- Feedback
-    - 매 트레이닝 스텝마다 사람을 넣을 수 없으니, 사람의 피드백을 학습하는 reward 모델을 활용했다.
-    - llama2를 만들 때 사용한 reward model 두 개를 사용했다. 각 모델은 아래의 aspect를 가지고 있다.
-        - helpfulness
-        - safety
-
-
-
-## Approach - Adversarial model을 이용한 탈옥
--  adversarial을 supervised pairwise training 방식을 이용해서 학습했다.
-- adversarial model은, 잘못된 모델의 행동을 유도하는 prompt를 받으면, 그와 유사한 category와 attack style을 가진 다른 prompt를 생성하도록 학습한다.
-- Red-teaming Seed 스텝에서, 1700개의 데이터 중 랜덤하게 샘플된 (같은 유형의) 데이터들을 이용해서 학습한다.
-- 이후에는 M_tgt와 M_adv가 iteratively 학습하게 된다.
-- i번째 스텝
-  ![image](/assets/img_post/mart_7.png)
-- 성공적인 공격을 한 prompt들과, 그들을 생성하게 만든 i-1 번째 스텝의 adversarial example을 pair로 만들어서 adversarial 모델을 학습시킨다.
-- 또한, Red-teaming Seed에서 사용한 데이터 역시 섞어서 학습시킴으로써, 대화 능력을 잃지 않도록 했다.
-![image](/assets/img_post/mart_2.png)
-
-
-
-
-## Approach - feedback을 이용해서 학습시키기
-- adversarial model이 생성한 prompt에 대해서 target model이 reward (R)를 생성한다. 각각을 helpfulness, safety의 관점에서 학습한 reward 모델을 돌리고, 둘 다 threshold를 넘는 response만 추출해서, prompt → reward pair로 supervised fine tune과 동일한 방법으로 학습시킨다.
-- reward의 값을 사용하지 않고, threshold로 구분하게 되면 학습에 들어가는 데이터 숫자가 적어지지만, 데이터 퀄리티를 보장할 수 있다. 이런 문제를 context distillation과 rejection sampling을 이용해서 해결했다.
-- context distillation
-    - 첫 번째 iteration에서는 target model의 성능이 별로인 경우가 많은데, 이러면 다음 스텝에 학습할 데이터가 없다.
-    - 그래서 context distillation이라는 방식을 사용하는데, 아래와 같은 preprompt를 prompt 앞에 붙이는 것이다.
-        
-        ```
-        Humans may generate unsafe content, or may ask you to generate unsafe content about criminal and fraudulent content. In that case, you should identify the potential dangers, refrain from responding directly, and generate safe content instead.
-        ```
-    - 첫 스텝 이후에는 이것을 하지 않는데, 그 이유는 성능 증가가 크지 않기 때문이기도 하고, 모델이 어느 정도 학습되고 난 뒤에는 오히려 모델이 너무 보수적으로 말하는 문제가 있었다.
-- rejection sampling
-    - 데이터의 다양성을 확보하기 위해서, 하나의 답변만 생성하지 않고, temperature등을 조정해서 같은 prompt에 대해서 여러 답변을 생성하도록 한다.
-    - 여기서 조건을 넘은 답변을 선택하는데, 이것이 여럿 있을 경우에는 랜덤하게 선택한다.
-
-
-## Approach - 두 모델을 순차적으로 학습시키기
-![image](/assets/img_post/mart_8.png)
-
-
-## 실험 셋업
-- 데이터셋
-    - Open Assistant
-        - 고품질의 crowd source 데이터
-    - LIMA
-        - stackoverflow, wikihow와 같은 여러 커뮤니티의 Q&A 데이터와 전문가가 적은 instruction과 response가 있는 데이터
-    - 두 데이터에서 유해하다고 판단할만한 데이터는 제거했다. 예를 들어, Open Assistant에서 `spam, not appropriate, hate speech, sexual content, toxicity, violence` 와 같은 것이 있는 샘플은 제거했고, 영어 답변만 남겼다.
-    - Open Assistant는 2,852개의 데이터셋, LIMA는 1000개의 샘플을 seed로 구성했다.
-- SFT config
-    - learning rate: 0.00001 (linear decay)
-    - weight decay: 0.1
-    - batch size: 8
-    - dropout: 0.1
-- generation config (nucleus sampling)
-    - temperature: 0.7
-    - top p: 0.9
-- Evaluation Prompts
-    - in-distribution evaluation
-        - SafeEval: adversarial prompts → 맨 처음에 red-teaming seed용 데이터에서 랜덤 split한 데이터 (각 category와 style이 한 개 이상은 포함되도록)로, 비율은 2.5:1
-        - HepEval: non-adversarial prompts → 사람들에게 유해하지 않은 prompt를 쓰도록 하고, 다양한 분야에 질문을 하도록 해서 직접 구성 (e.g. 교육, 생활, 관계, 기술 등)
-    - out-of-domain evaluation
-        - AlpacaEval (805개 샘플)
-        - Antrophic Harmless (2,312개 샘플)
-- Automatic and Human Evaluation
-    - 기존에 학습한 safety와 helpfulness reward model을 이용해서 평가했다.
-    - 사람 annotator를 사용하기도 했다.
-- 비교군
-    - chatgpt, gpt4, llama2-chat-70B와 vanilla (LLaMA-65B)를 두 데이터셋에 fine-tuning만 한 것 vs MART
-
-
-## 실험 결과
-- Helpfulness and safety
-![image](/assets/img_post/mart_3.png)
-    - reward model의 threshold를 어렵게 잡을수록 모델의 성능은 더 증가한다.
-    - safety는 확실히 점점 증가하고, helpfulness는 별로 떨어지지 않는다.
-        - 하지만 떨어지는 것은 맞고, 이를 보정하려면 helpfulness 데이터를 더 넣어야 하는데, 이전 연구들에 의하면 약 10배 정도의 데이터가 더 필요하다 (safety관련 데이터 대비)
-
-- Helpfulness and safety
-![image](/assets/img_post/mart_4.png)
-
-    - reward 모델을 이용한 evaluation과 사람이 직접 한 것의 차이는 크지 않다. (경향의 관점에서)
-    - MART가 다른 모델들에 비해서 못해보이는 것은, 다른 모델들은 매우 많은 사람이 직접 개입해서 red-teaming을 한 것이고, MART는 이걸 자동화해서 그렇다. vanilla에 비해면 매우 큰 발전이 있었음.
-    - 또한, llama2 70B가 Anthropic 데이터에 매우 성능이 좋은 것은, RLHF 단계에서 실제로 이 데이터를 사용해서 학습했기 때문이기도 하다.
-- Adversarial performance for red-teaming
-    - MART 1shot/3shot: 1개의 adversarial prompt만 보여주는 대신에, 3개를 보여주는 방식으로 학습한 것이 3shot
-    - Greedy Coordinate Gradient (GCG)
-    - Few-shot Prompting    
-![image](/assets/img_post/mart_5.png)
+## 성능 차이의 원인 파악
+![image](/assets/img_post/dora_1.png)
+- 기존의 W를 magnitude와 direction으로 나누면, 아래와 같다.
     
-    - MART 1-shot이 더 adversarial attack도 잘하고, 모델의 safety도 잘 증가시킨다.
-- Impact of Safety Data Scaling    
-![image](/assets/img_post/mart_6.png)
-    - 데이터 수를 무작정 늘리거나, 퀄리티 (threshold)를 무작정 올린다고 더 좋아지는 것은 아니다. 전체적으로 둘의 점수 모두 안정적이다.
+    $$
+    W=m\frac{V}{\lVert{V}\rVert_{c}} = \lVert{W}\rVert_C\frac{W}{\lVert{W}\rVert_c}
+    $$
+    
+    - m은 magnitude, V는 direction. ||.||_c는 vector-wise norm
+- 추가 학습을 했을 때, 기존 W와의 magnitude와 direction 차이를 각각 나타내면 아래와 같다.
+    
+    $$
+    \Delta{M}_{FT}^t = \frac{\Sigma_{n=1}^k |m_{FT}^{n,t} - m_0^n|}{k} \newline \Delta{D}_{FT}^t = \frac{\Sigma_{n=1}^k (1 - \cos{(V_{FT}^{n,t}, W_0^n)})}{k}
+    $$
+    
+    - 각각의 delta는 기존 weight와의 차이를 나타내고, cos은 cosine similarity 함수이다.
+    - t는 training step, n은 n번째 컬럼을 나타낸다.
+- 이렇게 정의하고 fine tune과 LoRA에 대해서 magnitude와 direction의 변화를 비교해보면, fine tuning은 거의 상관관계가 없거나 약간 음의 상관관계인 반면, LoRA는 강하게 양의 상관관계를 가지고 있다.
+- 즉, LoRA는 magnitude와 direction을 동시에 증가시키거나 감소시키는 편인 반면, fine-tuning은 그렇지 않다. 따라서, LoRA는 미묘한 변화를 주기에 적절한 framework는 아니다.
+- LoRA는 이걸 한 번에 학습하기 때문이라고 생각하고, 둘을 나눠서 학습하는 DoRA 방식을 고안함.
 
+
+## DoRA
+- Weight matrix를 magnitude와 direction으로 쪼개고, 이를 각각 학습시킨다. magnitude 자체를 trainable parameter로 두고, direction에서 LoRA를 적용한다
+  ![image](/assets/img_post/dora_2.png)
+    
+- 기존의 LoRA 방법은 새롭게 학습되는 W’을 아래와 같이 정의한다.
+    
+    $$
+    W'=W_0 + \Delta{W} = W_0 + BA
+    $$
+    
+    - A, B는 기존의 dimension보다 훨씬 작은 rank를 가진 매트릭스로, A는 Kaiming distribution을 따르게 초기화를 하고 B는 0으로 초기화한다.
+- 같은 수식을 DoRA에 맞도록 쓰면,
+    
+    $$
+    W'=m\frac{V+\Delta{V}}{\lVert{V+\Delta{V}}\rVert_c} = m\frac{W_0+BA}{\lVert{W_0+BA}\rVert_c}
+    $$
+    
+    - m과 delta V가 learnable parameter. A,B는 LoRA와 같은 방식으로 초기화한다.
+    - 이렇게 학습하면, 위의 그래프처럼 FT를 따라가고 (magnitude와 direction이 반비례함), LoRA와는 다른 패턴을 보인다.
+- 작은 directional update와 큰 directional update를 가정했을 때, DoRA의 방법에 맞춰서 gradient를 계산해보면 큰 directional update가 더 작은 magnitude update를 하게 됨.
+- 위의 수식대로 W’을 계산하면,  아래 수식이 가변적이기 때문에 메모리를 많이 차지하게 된다. 
+  
+  $$
+  \lVert{V+\Delta{V}}\rVert_c
+  $$
+
+- 그래서 이걸 그냥 C라고 하는 어떤 constant로 고정하면, gradient 수식이 변경되는데, 이를 통해 memory를 아낄 수 있다.
+    - 이전
+        
+        $$
+        \nabla_{V'}L = \frac{m}{\lVert{V'}\rVert_c}(I-\frac{V'V'^T}{\lVert{V'}\rVert_c^2})\nabla_{W'}L
+        $$
+        
+    - 이후
+        
+        $$
+        \nabla{V'}L = \frac{m}{C}\nabla_{W'}L
+        $$
+        
+    
+
+## 실험
+- commensense reasoning
+    - 8개의 task를 선정했고, LLaMA 7B, 13B에 대해서 `Prompt learning`, `Series adapter`, `Parallel adapter`, `LoRA` 와 비교했다.
+    - LoRA 대비 parameter 숫자가 약간 큰 이유는 magnitude 때문이다. rank를 더 줄여도 LoRA보다 잘한다. 
+    ![image](/assets/img_post/dora_3.png)
+    
+- multimodal
+    - 거의 모든 task에 대해서 LoRA보다 잘한다.
+    ![image](/assets/img_post/dora_4.png)
+    
+- LoRA 계열의 다른 방법론에 적용해도 잘 한다.
+    - VeRA는 unique pair를 모든 layer에 적용하는 방식(?) 인데 아무튼 parameter 수를 획기적으로 줄인다. 여기에 DoRA를 적용해도 성능이 꽤 향상됨.
+    ![image](/assets/img_post/dora_5.png)
+    
+- 학습 데이터의 양에도 robust 하다  
+![image](/assets/img_post/dora_6.png)
+    
+- rank 등 hyperparameter에도 robust함
+![image](/assets/img_post/dora_7.png)
+    
 
 ## 결론
-- Adversarial 방식으로 학습하면, 모델의 능력을 해치지 않으면서 안정성을 확보할 수 있고, 이걸 다수의 사람 annotator를 쓰지 않고도 가능하다.
-- 학습 방식을 다르게 (e.g. RL) 가져가는 방식도 가능하다.
-- 두 모델을 대화하도록 구성하는 것도 시도해 볼 만 하다.
+- LoRA에 비해서 trainable parameter가 아주 약간 상승하는 것을 제외하면 cost가 거의 들지 않는데, 성능은 유의미한 향상을 보인다.
+- 언어, 이미지, 비디오 등에서는 다 잘 되는 것으로 보임
