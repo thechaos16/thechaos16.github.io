@@ -23,11 +23,15 @@ tags: [LLM, Peft]
     W=m\frac{V}{\lVert{V}\rVert_{c}} = \lVert{W}\rVert_C\frac{W}{\lVert{W}\rVert_c}
     $$
     
-    - m은 magnitude, V는 direction. ||.||_c는 vector-wise norm
+    - m은 magnitude, V는 direction. 분모는 vector-wise norm
 - 추가 학습을 했을 때, 기존 W와의 magnitude와 direction 차이를 각각 나타내면 아래와 같다.
     
     $$
-    \Delta{M}_{FT}^t = \frac{\Sigma_{n=1}^k |m_{FT}^{n,t} - m_0^n|}{k} \newline \Delta{D}_{FT}^t = \frac{\Sigma_{n=1}^k (1 - \cos{(V_{FT}^{n,t}, W_0^n)})}{k}
+    \Delta{M}_{FT}^t = \frac{\Sigma_{n=1}^k |m_{FT}^{n,t} - m_0^n|}{k}
+    $$
+
+    $$
+    \Delta{D}_{FT}^t = \frac{\Sigma_{n=1}^k (1 - \cos{(V_{FT}^{n,t}, W_0^n)})}{k}
     $$
     
     - 각각의 delta는 기존 weight와의 차이를 나타내고, cos은 cosine similarity 함수이다.
