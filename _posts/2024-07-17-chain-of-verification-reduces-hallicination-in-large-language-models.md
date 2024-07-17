@@ -7,7 +7,7 @@ tags: [LLM, Factuality]
 ---
 
 ## 논문 링크
-- [논문 링크] https://arxiv.org/pdf/2309.11495.pdf
+- [논문 링크](https://arxiv.org/pdf/2309.11495.pdf)
 
 
 ## 배경
