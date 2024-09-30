@@ -1,5 +1,5 @@
 ---
-title: GQA, Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints
+title: GQA, Training Generalized Multi Query Transformer Models from Multi Head Checkpoints
 author: ethereal
 date: 2024-10-01 01:30:00 +0900
 categories: [ML]
