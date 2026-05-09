@@ -6,7 +6,7 @@ categories: [ML]
 tags: [LLM, inference, speculative decoding]
 ---
 ## 논문 링크
-- https://arxiv.org/pdf/2603.03251
+- [논문](https://arxiv.org/pdf/2404.19245)
 
 ## 개요
 
