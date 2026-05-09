@@ -65,6 +65,10 @@ self.addEventListener('fetch', (event) => {
       return fetch(event.request).then((response) => {
         const url = event.request.url;
 
+        if (!url.startsWith('http')) {
+          return response;
+        }
+
         if (purge || event.request.method !== 'GET' || !verifyUrl(url)) {
           return response;
         }
