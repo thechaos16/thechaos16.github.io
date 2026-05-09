@@ -1,7 +1,7 @@
 ---
 title: Speculative speculative decoding
 author: ethereal
-date: 2026-05-10 01:30:00 +0900
+date: 2026-05-10 01:20:00 +0900
 categories: [ML]
 tags: [LLM, inference, speculative decoding]
 ---
